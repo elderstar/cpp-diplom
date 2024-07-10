@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34728.123
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Spider_app", "Spider_app.vcxproj", "{B02BFFD1-E441-4241-AAC1-15716FC6A970}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Seeker_app", "..\Seeker_app\Seeker_app.vcxproj", "{8F2244AF-1394-49E0-9995-F1FB09EC36A0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решения", "Элементы решения", "{AB861DED-F137-4A12-AB12-D878A288D4C7}"
+	ProjectSection(SolutionItems) = preProject
+		..\config.ini = ..\config.ini
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Debug|x64.ActiveCfg = Debug|x64
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Debug|x64.Build.0 = Debug|x64
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Debug|x86.ActiveCfg = Debug|Win32
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Debug|x86.Build.0 = Debug|Win32
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Release|x64.ActiveCfg = Release|x64
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Release|x64.Build.0 = Release|x64
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Release|x86.ActiveCfg = Release|Win32
+		{B02BFFD1-E441-4241-AAC1-15716FC6A970}.Release|x86.Build.0 = Release|Win32
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Debug|x64.ActiveCfg = Debug|x64
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Debug|x64.Build.0 = Debug|x64
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Debug|x86.ActiveCfg = Debug|Win32
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Debug|x86.Build.0 = Debug|Win32
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Release|x64.ActiveCfg = Release|x64
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Release|x64.Build.0 = Release|x64
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Release|x86.ActiveCfg = Release|Win32
+		{8F2244AF-1394-49E0-9995-F1FB09EC36A0}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8ED8D64F-52C6-4C96-A930-6AEBB3495911}
+	EndGlobalSection
+EndGlobal
