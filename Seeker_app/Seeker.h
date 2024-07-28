@@ -9,6 +9,8 @@ public:
     void start();
 
 private:
+    std::string lowercase(const std::string& str);
+    std::string url_decode(const std::string& value);
     std::string searchDb(const std::vector<std::string>& words);
     std::vector<std::string> split(const std::string& str, char delim);
     int port;

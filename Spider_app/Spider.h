@@ -6,7 +6,7 @@
 
 class Spider {
 public:
-    Spider(const std::string& _start_url, int _max_depth, const std::string& db_host, const std::string& db_port, const std::string& db_name, const std::string& db_user, const std::string& db_password);
+    Spider(const std::string& start_url, int max_depth, const std::string& db_host, const std::string& db_port, const std::string& db_name, const std::string& db_user, const std::string& db_password);
     void start();
     bool initDb();
 
@@ -17,7 +17,10 @@ private:
     std::map<std::string, int> buildIndex(const std::string& text);
     void saveToDb(const std::string& url, const std::map<std::string, int>& index);
     std::smatch parseUrl(const std::string& url);
-     
+    std::string lowercase(const std::string& str);
+    std::string buildUrl(const std::string& url, const std::string& host);
+    
+
     std::string _start_url;
     int _max_depth;
     std::string _db_host;

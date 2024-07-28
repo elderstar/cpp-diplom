@@ -25,6 +25,9 @@ void readConfig(const std::string& filename, std::map<std::string, std::string>&
 
 int main() {
 
+    system("chcp 1251");
+    setlocale(LC_ALL, "ru_RU.UTF-8");
+
     std::map<std::string, std::string> config;
     readConfig("../config.ini", config);
 

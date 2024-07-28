@@ -3,6 +3,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/asio.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/beast/version.hpp>
@@ -11,6 +12,7 @@
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
+namespace algo = boost::algorithm;
 using tcp = net::ip::tcp;
 
 Seeker::Seeker(int port, const std::string& _db_host, const std::string& db_port, const std::string& _db_name, const std::string& _db_user, const std::string& _db_password)
@@ -41,21 +43,19 @@ void Seeker::start() {
 
         http::response<http::string_body> res{ http::status::ok, req.version() };
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
+        res.set(http::field::content_type, "text/html; charset=UTF-8");
 
         if (req.method() == http::verb::get) {
             res.body() = "<html><body><form action='/search' method='post'><input type='text' name='query'/><input type='submit' value='Search'/></form></body></html>";
         }
         else if (req.method() == http::verb::post) {
-            auto query = req.body();
-            std::cout << query << std::endl;
+            auto query = url_decode(req.body());
 
             size_t pos = query.find('=');
 
             if (pos == std::string::npos)
             {
                 res.result(http::status::not_found);
-                res.set(http::field::content_type, "text/plain");
                 res.body() = "Not found\r\n";
                 return;
             }
@@ -66,12 +66,11 @@ void Seeker::start() {
             if (key != "query")
             {
                 res.result(http::status::not_found);
-                res.set(http::field::content_type, "text/plain");
                 res.body() = "Not found\r\n";
                 return;
             }
 
-            std::vector<std::string> words = split(query, '+');
+            std::vector<std::string> words = split(query, ' ');
 
             if (words.empty()) {
                 res.body() = "No results found\r\n";
@@ -79,6 +78,9 @@ void Seeker::start() {
             }
 
             auto result = searchDb(words);
+            if (result.empty()) {
+                result = "No results found\r\n";
+            }
             res.body() = "<html><body><h1>Search Results</h1><pre>" + result + "</pre></body></html>";
         }
         else {
@@ -90,6 +92,30 @@ void Seeker::start() {
         http::write(socket, res);
     }
 }
+
+    std::string Seeker::url_decode(const std::string& value) {
+        std::string result;
+        result.reserve(value.size());
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (value[i] == '%' && i + 2 < value.size()) {
+                std::string hex = value.substr(i + 1, 2);
+                result += static_cast<char>(std::stoi(hex, nullptr, 16));
+                i += 2;
+            }
+            else if (value[i] == '+') {
+                result += ' ';
+            }
+            else {
+                result += value[i];
+            }
+        }
+        return result;
+    }
+
+    std::string Seeker::lowercase(const std::string& str) {
+
+        return algo::to_lower_copy(str);
+    }
 
     std::string Seeker::searchDb(const std::vector<std::string>& words) {
     std::string result;
@@ -103,8 +129,9 @@ void Seeker::start() {
             in_clause += W.quote(word) + ",";
         }
         in_clause.pop_back();
-       
-        std::cout << in_clause << std::endl;
+        in_clause = lowercase(in_clause);
+
+        std::cout << "Search: " + in_clause << std::endl;
 
         std::string sql = "SELECT d.url, SUM(dw.frequency) as relevance \
             FROM documents d \

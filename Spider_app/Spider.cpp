@@ -11,10 +11,13 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/regex.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/url.hpp>
 #include <openssl/ssl.h> 
 
 #include <thread>
 #include <queue>
+#include <unordered_set>
 #include <mutex>
 #include <condition_variable>
 #include <sstream>
@@ -24,16 +27,21 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
 namespace ssl = boost::asio::ssl;
+namespace algo = boost::algorithm;
 using tcp = net::ip::tcp;
 
-Spider::Spider(const std::string& _start_url, int _max_depth, const std::string& db_host, const std::string& db_port, const std::string& db_name, const std::string& db_user, const std::string& db_password)
-    : _start_url(_start_url), _max_depth(_max_depth), _db_host(db_host), _db_port(db_port), _db_name(db_name), _db_user(db_user), _db_password(db_password) {}
+Spider::Spider(const std::string& start_url, int max_depth, const std::string& db_host, const std::string& db_port, const std::string& db_name, const std::string& db_user, const std::string& db_password)
+    : _start_url(start_url), _max_depth(max_depth), _db_host(db_host), _db_port(db_port), _db_name(db_name), _db_user(db_user), _db_password(db_password) {}
 
 void Spider::start() {
     std::queue<std::pair<std::string, int>> url_queue;
+    std::unordered_set<std::string> visited_urls;
     std::mutex queue_mutex;
     std::condition_variable queue_cv;
     bool done = false;
+    
+    boost::urls::url_view url(_start_url);
+    std::string host = url.host();
 
     auto worker = [&]() {
         while (true) {
@@ -46,6 +54,7 @@ void Spider::start() {
 
             auto [url, depth] = url_queue.front();
             url_queue.pop();
+
             lock.unlock();
 
             if (depth > _max_depth) {
@@ -63,14 +72,21 @@ void Spider::start() {
             std::regex re("<a href=\"(.*?)\"");
             std::smatch match;
             std::string::const_iterator search_start(html.cbegin());
-            while (std::regex_search(search_start, html.cend(), match, re)) {
-                std::string new_url = match[1];
+            while (std::regex_search(search_start, html.cend(), match, re)) 
+            {
+                if (match[1] != "" || match[1] != "/" || match[1] != "#")
                 {
-                    std::lock_guard<std::mutex> lock(queue_mutex);
-                    url_queue.emplace(new_url, depth + 1);
+                    std::string new_url = buildUrl(match[1], host);
+                    if (visited_urls.find(new_url) == visited_urls.end()) {
+                        visited_urls.insert(new_url);
+                        {
+                            std::lock_guard<std::mutex> lock(queue_mutex);
+                            url_queue.emplace(new_url, depth + 1);
+                        }
+                        queue_cv.notify_one();
+                    }
+                    search_start = match.suffix().first;
                 }
-                queue_cv.notify_one();
-                search_start = match.suffix().first;
             }
         }
     };
@@ -82,7 +98,8 @@ void Spider::start() {
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
-        url_queue.emplace(_start_url, 0);
+        url_queue.emplace(_start_url, 1);
+        visited_urls.insert(_start_url);
     }
     queue_cv.notify_one();
 
@@ -94,6 +111,8 @@ void Spider::start() {
 std::string Spider::fetchPage(const std::string& url) {
     try
     {
+        std::cout << std::this_thread::get_id() << " try to fetch: " + url << std::endl;
+
         net::io_context ioc;
         tcp::resolver resolver(ioc);
         beast::tcp_stream stream(ioc);
@@ -136,8 +155,6 @@ std::string Spider::fetchPage(const std::string& url) {
 
             beast::error_code ec;
             stream.shutdown(ec);
-            std::cout << res.result_int() << std::endl;
-            std::cout << beast::buffers_to_string(res.body().data()) << std::endl;
 
             return beast::buffers_to_string(res.body().data());
         }
@@ -163,29 +180,56 @@ std::string Spider::fetchPage(const std::string& url) {
             return beast::buffers_to_string(res.body().data());
         }
     }
-    catch (const std::exception&)
+    catch (const std::exception& e)
     {
+        std::cerr << e.what() << std::endl;
         return "0";
     }
 }
 
 std::string Spider::eraseTags(const std::string& html) {
+
     std::regex re("<[^>]*>");
     return std::regex_replace(html, re, "");
 }
 
 std::string Spider::erasePuncts(const std::string& html) {
+
     std::regex punc_regex("[[:punct:]]");
     return std::regex_replace(html, punc_regex, "");
+}
+
+std::string Spider::lowercase(const std::string& str) {
+
+    return algo::to_lower_copy(str);
+}
+
+std::string Spider::buildUrl(const std::string& url, const std::string& host)
+{
+    if (url.find("://") == std::string::npos)
+    {
+        std:std::string div = "";
+        if (url.at(0) != '/')
+            div = '/';
+
+        return "https://" + host + div + url;
+    }
+    else {
+        return url;
+    }
 }
 
 std::map<std::string, int> Spider::buildIndex(const std::string& text) {
     std::map<std::string, int> index;
     std::istringstream iss(text);
     std::string word;
+
     while (iss >> word) {
-        if(word.size() > 3 && word.size() < 33)
+        if (word.size() > 3 && word.size() < 33)
+        {
+            word = lowercase(word);
             index[word]++;
+        }
     }
     return index;
 }
@@ -239,20 +283,47 @@ void Spider::saveToDb(const std::string& url, const std::map<std::string, int>& 
     try {
         pqxx::connection C("host=" + _db_host + " port=" + _db_port + " dbname=" + _db_name + " user=" + _db_user + " password=" + _db_password);
         pqxx::work W(C); 
-        std::cout << url << std::endl;
+        std::cout << std::this_thread::get_id() << " save result of: " + url << std::endl;
         pqxx::result R = W.exec("INSERT INTO documents (url) VALUES (" + W.quote(url) + ") ON CONFLICT (url) DO NOTHING RETURNING id;");
+
         int doc_id = 0;
-        if(!R.empty())
+
+        if (!R.empty()) {
             doc_id = R[0][0].as<int>();
+        }
+        else {
+            pqxx::result select_result = W.exec("SELECT id FROM documents WHERE url = " + W.quote(url) + ";");
+
+            if (!select_result.empty()) {
+                doc_id = select_result[0][0].as<int>();
+            }
+            else {
+                throw std::runtime_error("Failed to retrieve ID for existing document.");
+            }
+        }
 
         for (const auto& [word, freq] : index) {
-            std::cout << word << std::endl;
 
             R = W.exec("INSERT INTO words (word) VALUES (" + W.quote(word) + ") ON CONFLICT (word) DO NOTHING RETURNING id;");
-            if (!R.empty() && doc_id != NULL)
+
+            int word_id = 0;
+
+            if (!R.empty()) {
+                word_id = R[0][0].as<int>();
+            }
+            else {
+                pqxx::result select_result = W.exec("SELECT id FROM words WHERE word = " + W.quote(word) + ";");
+
+                if (!select_result.empty()) {
+                    word_id = select_result[0][0].as<int>();
+                }
+                else {
+                    throw std::runtime_error("Failed to retrieve ID for existing word.");
+                }
+            }
+
+            if (word_id != 0 && doc_id != 0)
             {
-                int word_id = R[0][0].as<int>();
-            
                 W.exec("INSERT INTO words_to_documents (document_id, word_id, frequency) VALUES (" 
                     + W.quote(doc_id) + ", " + W.quote(word_id) + ", " + W.quote(freq) + ");");
             }

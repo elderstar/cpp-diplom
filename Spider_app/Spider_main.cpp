@@ -30,9 +30,9 @@ int main() {
     std::map<std::string, std::string> config;
     readConfig("../config.ini", config);
 
-    std::string _start_url = config["spider._start_url"];
+    std::string start_url = config["spider.start_url"];
     std::string max_depth_str = config["spider.depth"];
-    int _max_depth = 0;
+    int max_depth = 0;
 
     std::string db_host = config["db.host"];
     std::string db_name = config["db.name"];
@@ -42,16 +42,22 @@ int main() {
 
     if (!max_depth_str.empty())
     {
-        _max_depth = std::stoi(max_depth_str);
+        max_depth = std::stoi(max_depth_str);
     }
 
-    if (_start_url.empty())
+    if (max_depth <= 0)
+    {
+        std::cout << "Depth has to be greater than 0. Exit." << std::endl;
+        exit(0);
+    }
+
+    if (start_url.empty())
     {
         std::cout << "URL can not be empty. Exit." << std::endl;
         exit(0);
     }
 
-    Spider spider(_start_url, _max_depth, db_host, db_port, db_name, db_user, db_password);
+    Spider spider(start_url, max_depth, db_host, db_port, db_name, db_user, db_password);
     if (!spider.initDb())
     {
         std::cout << "DB initialization failed. Exit." << std::endl;
